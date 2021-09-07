@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Image push API
+
+  Push Image to private registry
+
+Globals:
+  Function:
+    Timeout: 30
+
+Resources:
+  ImagePushApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Auth:
+        DefaultAuthorizer: ImageTokenAuthorizer
+        Authorizers:
+          ImageTokenAuthorizer:
+            FunctionArn: !GetAtt ImageTokenAuthorizerFunction.Arn
+
+  ImageTokenAuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Handler:
+    Metadata:
+      DockerTag: v1
+      DockerContext: ./authorizer
+      Dockerfile: Dockerfile
+
+  ImagePushFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Events:
+        PutImage:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ImagePushApi
+            Path: /image
+            Method: PUT
+    Metadata:
+      DockerTag: v1
+      DockerContext: ./image-push
+      Dockerfile: Dockerfile
+
+Outputs:
+  ImagePushApi:
+    Description: "API Gateway endpoint URL for lab environment for image API"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/dev/image/"
+  ImageFunction:
+    Description: "push image to image registry"
+    Value: !GetAtt ImagePushFunction.Arn
+  ImagePushFunctionIamRole:
+    Description: "Implicit IAM Role created for ImagePush function"
+    Value: !GetAtt ImagePushFunctionRole.Arn
